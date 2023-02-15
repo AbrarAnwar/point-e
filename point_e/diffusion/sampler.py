@@ -161,12 +161,16 @@ class PointCloudSampler:
                     clip_denoised=self.clip_denoised,
                 )
             for x in samples_it:
+                # import pdb; pdb.set_trace()
+                hiddens = x[1]
+                x = x[0]
                 samples = x["pred_xstart"][:batch_size]
+                hiddens = hiddens[:batch_size]
                 if "low_res" in stage_model_kwargs:
                     samples = torch.cat(
                         [stage_model_kwargs["low_res"][: len(samples)], samples], dim=-1
                     )
-                yield samples
+                yield samples, hiddens
 
     @classmethod
     def combine(cls, *samplers: "PointCloudSampler") -> "PointCloudSampler":

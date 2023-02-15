@@ -222,8 +222,9 @@ class PointDiffusionTransformer(nn.Module):
         h = self.ln_post(h)
         if len(extra_tokens):
             h = h[:, sum(h.shape[1] for h in extra_tokens) :]
+        final_hidden = h
         h = self.output_proj(h)
-        return h.permute(0, 2, 1)
+        return h.permute(0, 2, 1), final_hidden.cpu().detach().numpy()
 
 
 class CLIPImagePointDiffusionTransformer(PointDiffusionTransformer):

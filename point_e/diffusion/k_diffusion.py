@@ -105,7 +105,7 @@ class GaussianToKarrasDenoiser:
         out = self.diffusion.p_mean_variance(
             self.model, x_t * c_in, t, clip_denoised=clip_denoised, model_kwargs=model_kwargs
         )
-        return None, out["pred_xstart"]
+        return out['extra'], out["pred_xstart"], 
 
 
 def karras_sample(*args, **kwargs):
@@ -157,10 +157,10 @@ def karras_sample_progressive(
         model = GaussianToKarrasDenoiser(model, diffusion)
 
         def denoiser(x_t, sigma):
-            _, denoised = model.denoise(
+            extra, denoised = model.denoise(
                 x_t, sigma, clip_denoised=clip_denoised, model_kwargs=model_kwargs
             )
-            return denoised
+            return denoised, extra
 
     else:
         raise NotImplementedError
@@ -170,10 +170,10 @@ def karras_sample_progressive(
         def guided_denoiser(x_t, sigma):
             x_t = th.cat([x_t, x_t], dim=0)
             sigma = th.cat([sigma, sigma], dim=0)
-            x_0 = denoiser(x_t, sigma)
+            x_0, extra = denoiser(x_t, sigma)
             cond_x_0, uncond_x_0 = th.split(x_0, len(x_0) // 2, dim=0)
             x_0 = uncond_x_0 + guidance_scale * (cond_x_0 - uncond_x_0)
-            return x_0
+            return x_0, extra
 
     else:
         guided_denoiser = denoiser
@@ -186,7 +186,10 @@ def karras_sample_progressive(
         **sampler_args,
     ):
         if isinstance(diffusion, GaussianDiffusion):
-            yield diffusion.unscale_out_dict(obj)
+            extra = obj['extra1']
+            del obj['extra1']
+            # import pdb; pdb.set_trace()
+            yield diffusion.unscale_out_dict(obj), extra
         else:
             yield obj
 
@@ -262,9 +265,9 @@ def sample_heun(
         sigma_hat = sigmas[i] * (gamma + 1)
         if gamma > 0:
             x = x + eps * (sigma_hat**2 - sigmas[i] ** 2) ** 0.5
-        denoised = denoiser(x, sigma_hat * s_in)
+        denoised, extra1 = denoiser(x, sigma_hat * s_in)
         d = to_d(x, sigma_hat, denoised)
-        yield {"x": x, "i": i, "sigma": sigmas[i], "sigma_hat": sigma_hat, "pred_xstart": denoised}
+        yield {"x": x, "i": i, "sigma": sigmas[i], "sigma_hat": sigma_hat, "pred_xstart": denoised, 'extra1':extra1}
         dt = sigmas[i + 1] - sigma_hat
         if sigmas[i + 1] == 0:
             # Euler method
@@ -272,11 +275,11 @@ def sample_heun(
         else:
             # Heun's method
             x_2 = x + d * dt
-            denoised_2 = denoiser(x_2, sigmas[i + 1] * s_in)
+            denoised_2, extra1 = denoiser(x_2, sigmas[i + 1] * s_in)
             d_2 = to_d(x_2, sigmas[i + 1], denoised_2)
             d_prime = (d + d_2) / 2
             x = x + d_prime * dt
-    yield {"x": x, "pred_xstart": denoised}
+    yield {"x": x, "pred_xstart": denoised, 'extra1':extra1}
 
 
 @th.no_grad()

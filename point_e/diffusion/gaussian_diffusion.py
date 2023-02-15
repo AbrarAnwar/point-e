@@ -283,6 +283,7 @@ class GaussianDiffusion:
         B, C = x.shape[:2]
         assert t.shape == (B,)
         model_output = model(x, t, **model_kwargs)
+        # import pdb; pdb.set_trace()
         if isinstance(model_output, tuple):
             model_output, extra = model_output
         else:
